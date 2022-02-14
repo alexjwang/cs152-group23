@@ -79,9 +79,11 @@ class ModBot(discord.Client):
 
         author_id = message.author.id
         responses = []
+        print("line 82")
 
         # Only respond to messages if they're part of a reporting flow
         if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD):
+            print("line 85")
             return
 
         # If we don't currently have an active report for this user, add one

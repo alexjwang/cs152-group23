@@ -6,6 +6,9 @@ class State(Enum):
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
     MESSAGE_IDENTIFIED = auto()
+    SCAM_IDENTIFIED = auto()
+    ABUSE_TYPE_IDENTIFIED = auto()
+    ABUSE_DETAILS= auto()
     REPORT_COMPLETE = auto()
 
 class Report:
@@ -56,12 +59,31 @@ class Report:
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "This is all I know how to do right now - it's up to you to build out the rest of my reporting flow!"]
+                    "Do you want to report this message as a scam? Please answer yes or no."]
         
         if self.state == State.MESSAGE_IDENTIFIED:
-            return ["<insert rest of reporting flow here>"]
+            self.state = State.SCAM_IDENTIFIED
+            if message.content == "yes": 
+                return ["Is this message related to finance (investment, buying crytocurrencies etc.)"]
+            else:
+                return ["TODO: other abuse types"]
+        if self.state == State.SCAM_IDENTIFIED:
+            self.state = State.ABUSE_TYPE_IDENTIFIED
+            if message.content == "yes": 
+                return ["What is wrong with this message or account?"]
+            else: 
+                return ["TODO: other scam types"]
+        if self.state == State.ABUSE_TYPE_IDENTIFIED:
+            self.state = State.ABUSE_DETAILS
+            return ["Have you lost money due to interaction with this account?"]
+        if self.state == State.ABUSE_DETAILS:
+            self.state = State.REPORT_COMPLETE
+            if message.content == "yes": 
+                return ["We will investigate this message and get back to you soon"]
+            else: 
+                return ["TODO: no money lost"]
 
-        return []
+        
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
