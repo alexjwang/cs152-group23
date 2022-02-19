@@ -7,9 +7,19 @@ class State(Enum):
     AWAITING_MESSAGE = auto()
     MESSAGE_IDENTIFIED = auto()
     SCAM_IDENTIFIED = auto()
+    REPORT_TYPPE_IDENTIFIED = auto()
     ABUSE_TYPE_IDENTIFIED = auto()
     ABUSE_DETAILS= auto()
     REPORT_COMPLETE = auto()
+    SCAM_FOUND = auto()
+    MISLEADING_TYPE = auto()
+    NOT_RELATED_TO_FINANCE = auto()
+    MONEY_CHECKED = auto()
+    REPORT_ELSE = auto()
+    ADDITIONAL_INFO = auto()
+    MISLEADING_REASON = auto()
+    CHECK_TYPE = auto()
+    CHECK_MONEY = auto()
 
 class Report:
     START_KEYWORD = "report"
@@ -59,31 +69,110 @@ class Report:
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "Do you want to report this message as a scam? Please answer yes or no."]
-        
+                    "Help us understand the problem. What's going on with this message? Please type the number of the following reaons: 1. I am not interested in this message. 2. It's suspicious or scam. 3. It's abusive or harmful. 4. It's misleading. 5. It expresses intentions of self-hard or suicide."]
+      
         if self.state == State.MESSAGE_IDENTIFIED:
-            self.state = State.SCAM_IDENTIFIED
-            if message.content == "yes": 
-                return ["Is this message related to finance (investment, buying crytocurrencies etc.)"]
-            else:
-                return ["TODO: other abuse types"]
-        if self.state == State.SCAM_IDENTIFIED:
-            self.state = State.ABUSE_TYPE_IDENTIFIED
-            if message.content == "yes": 
-                return ["What is wrong with this message or account?"]
-            else: 
-                return ["TODO: other scam types"]
-        if self.state == State.ABUSE_TYPE_IDENTIFIED:
-            self.state = State.ABUSE_DETAILS
-            return ["Have you lost money due to interaction with this account?"]
-        if self.state == State.ABUSE_DETAILS:
-            self.state = State.REPORT_COMPLETE
-            if message.content == "yes": 
-                return ["We will investigate this message and get back to you soon"]
-            else: 
-                return ["TODO: no money lost"]
+            if message.content == "1": 
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+            elif message.content == "2": 
+                self.state = State.SCAM_FOUND
+                return ["Is this message related to finance (investment, buying crytocurrencies etc.) Please answer yes or no."]
 
-        
+            elif message.content == "3": 
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+
+            elif message.content == "4": 
+                self.state = State.MISLEADING_TYPE
+                
+            elif message.content == "5": 
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+            else: 
+                return["Please choose a number."]
+        if self.state == State.MISLEADING_TYPE: 
+            self.state = State.MISLEADING_REASON
+            return ["Why is this message misleading? Please type the number the of following reasons: 1. Politices 2. Health 3. Something else"]
+
+        if self.state == State.MISLEADING_REASON: 
+            if message.content == "1":
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]  
+            elif message.content == "2":
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+            elif message.content == "3":
+                self.state = State.CHECK_TYPE
+                return ["Is this message related to finance (investment, buying crytocurrencies etc.) Please answer yes or no."]
+            else: 
+                return ["Please choose a number."]
+
+        if self.state == State.CHECK_TYPE:
+            if message.content == "yes": 
+                self.state = State.SCAM_IDENTIFIED
+                return ["What's wrong with this message or the user who posted it? Please type the number the of following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+            elif message.content == "no":
+                self.state = State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+            else: 
+                return["Please answer yes or no."]
+
+        if self.state == State.SCAM_FOUND:
+            if message.content == "yes": 
+                self.state = State.SCAM_IDENTIFIED
+                return ["What's wrong with this message or the user who posted it? Please type the number the of following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+            elif message.content == "no":
+                self.state = State.NOT_RELATED_TO_FINANCE
+                return ["What is the tweet related to?  Please type the number the of following reasons: 1. The accout posted the message is feak. 2. the message contains links to potentially harmful, malicious, phishing site. 3. The hashtags seem unrelated. 4. The message is a spam. 5. Someting else"]
+            else: 
+                return["Please answer yes or no."]
+                
+        if self.state == State.NOT_RELATED_TO_FINANCE: 
+            if message.content == "1" or message.content == "2" or message.content == "3" or message.content == "4" or message.content == "5": 
+                self.state= State.REPORT_COMPLETE
+                return ["We will investigate this message and get back to you soon."]
+            else: 
+                return["Please choose a number."]
+
+        if self.state == State.SCAM_IDENTIFIED:
+            if message.content == "1":
+                self.state = State.CHECK_MONEY 
+                return ["Have you lost money due to interaction with this account? Please answer yes or no."]
+            elif message.content == "2":
+                self.state = State.CHECK_MONEY 
+                return ["Have you lost money due to interaction with this account? Please answer yes or no."]
+            elif message.content == "3":
+                self.state = State.CHECK_MONEY 
+                return ["Have you lost money due to interaction with this account? Please answer yes or no."]    
+            else: 
+                return["Please choose a number."]
+
+        if self.state == State.CHECK_MONEY:
+            if message.content == "yes":
+                self.state = State.MONEY_CHECKED
+            elif message.content == "no":
+                self.state = State.MONEY_CHECKED        
+            else: 
+                return["Please answer yes or no."]
+
+        if self.state == State.MONEY_CHECKED: 
+            self.state = State.REPORT_ELSE
+            return ["Anything else you would like to report? Please answer yes or no"]
+
+        if self.state == State.REPORT_ELSE:
+            if message.content == "yes":
+                self.state = State.ADDITIONAL_INFO
+                return ["Please type any information you think is relevant."]
+            elif message.content == "no":
+                self.state = State.REPORT_COMPLETE     
+                return ["We will investigate this message and get back to you soon."]  
+            else: 
+                return["Please answer yes or no."]
+
+        if self.state == State.ADDITIONAL_INFO:
+            self.state = State.REPORT_COMPLETE     
+            return ["We will investigate this message and get back to you soon."]  
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
