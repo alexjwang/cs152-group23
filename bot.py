@@ -117,9 +117,7 @@ class ModBot(discord.Client):
         Given a message, forwards the message to Perspective and returns a dictionary of scores.
         '''
         PERSPECTIVE_URL = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
-        print('original message content:', message.content)
         message.content = unidecode(message.content, errors='preserve')
-        print('decoded message content:', message.content)
         url = PERSPECTIVE_URL + '?key=' + self.perspective_key
         data_dict = {
             'comment': {'text': message.content},
