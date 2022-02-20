@@ -7,6 +7,7 @@ import logging
 import re
 import requests
 from report import Report
+from unidecode import unidecode 
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -116,7 +117,9 @@ class ModBot(discord.Client):
         Given a message, forwards the message to Perspective and returns a dictionary of scores.
         '''
         PERSPECTIVE_URL = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
-
+        print('original message content:', message.content)
+        message.content = unidecode(message.content, errors='preserve')
+        print('decoded message content:', message.content)
         url = PERSPECTIVE_URL + '?key=' + self.perspective_key
         data_dict = {
             'comment': {'text': message.content},
@@ -130,7 +133,6 @@ class ModBot(discord.Client):
         }
         response = requests.post(url, data=json.dumps(data_dict))
         response_dict = response.json()
-
         scores = {}
         for attr in response_dict["attributeScores"]:
             scores[attr] = response_dict["attributeScores"][attr]["summaryScore"]["value"]
