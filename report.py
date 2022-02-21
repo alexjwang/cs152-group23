@@ -20,12 +20,13 @@ class State(Enum):
     MISLEADING_REASON = auto()
     CHECK_TYPE = auto()
     CHECK_MONEY = auto()
+    ACTION_NEEDED = auto()
 
 class Report:
     START_KEYWORD = "report"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
-
+    
     def __init__(self, client):
         self.state = State.REPORT_START
         self.client = client
@@ -113,8 +114,8 @@ class Report:
                 self.state = State.SCAM_IDENTIFIED
                 return ["What's wrong with this message or the user who posted it? Please type the number the of following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
             elif message.content == "no":
-                self.state = State.REPORT_COMPLETE
-                return ["We will investigate this message and get back to you soon."]
+                self.state = State.ACTION_NEEDED
+                return ["Would like to block or mute the account? Please answer block or mute."]
             else: 
                 return["Please answer yes or no."]
 
@@ -151,6 +152,7 @@ class Report:
         if self.state == State.CHECK_MONEY:
             if message.content == "yes":
                 self.state = State.MONEY_CHECKED
+                
             elif message.content == "no":
                 self.state = State.MONEY_CHECKED        
             else: 
@@ -165,14 +167,23 @@ class Report:
                 self.state = State.ADDITIONAL_INFO
                 return ["Please type any information you think is relevant."]
             elif message.content == "no":
-                self.state = State.REPORT_COMPLETE     
-                return ["We will investigate this message and get back to you soon."]  
+                self.state = State.ACTION_NEEDED     
+                return ["Would like to block or mute the account? Please answer block or mute."]  
             else: 
                 return["Please answer yes or no."]
+        if self.state == State.ACTION_NEEDED: 
+            if message.content== "block": 
+                self.state = State.REPORT_COMPLETE  
+                return ["Thanks for reporting! We've blocked the account."]
+            elif message.content == "mute":
+                self.state = State.REPORT_COMPLETE  
+                return ["Thanks for reporting! We've muted the account."]
+            else: 
+                return ["Please answer block or mute."]
 
         if self.state == State.ADDITIONAL_INFO:
-            self.state = State.REPORT_COMPLETE     
-            return ["We will investigate this message and get back to you soon."]  
+            self.state = State.ACTION_NEEDED     
+            return ["Would like to block or mute the account? Please answer block or mute."]  
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
