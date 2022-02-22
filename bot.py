@@ -36,6 +36,8 @@ class ModBot(discord.Client):
         self.reports = {} # Map from user IDs to the state of their report
         self.perspective_key = key
 
+        self.to_cr_report = set() # Set of message IDs that require a content reviewer report
+
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
@@ -55,6 +57,36 @@ class ModBot(discord.Client):
                 if channel.name == f'group-{self.group_num}-mod':
                     self.mod_channels[guild.id] = channel
 
+    async def on_raw_reaction_add(self, payload):
+        '''
+        This function is called whenever a user reacts to a message in a channel that the bot can see.
+        Currently the bot is configured to send a message describing the action taken to the "group-#-mod" channel.
+        '''
+        if payload.guild_id not in self.mod_channels:
+            return
+        if payload.channel_id != self.mod_channels[payload.guild_id].id:
+            return
+        mod_channel = self.mod_channels[payload.guild_id]
+        message = await mod_channel.fetch_message(payload.message_id)
+        
+        # Make sure it's a report forwarded by the bot
+        if message.reference is not None or message.author.id != self.user.id:
+            return
+
+        if payload.emoji.name == '👍':
+            r = (f"Sufficient public indication that Tweet is a scam according to {payload.member.name}. "
+            "Applying warning to Tweet. "
+            "Please reply to this message with content reviewer report. "
+            )
+            await message.reply(r)
+            # Marks are requiring content review report
+            self.to_cr_report.add(payload.message_id)
+        elif payload.emoji.name == '👎':
+            r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
+            "Applying warning to Tweet, as well as additional information. "
+            )
+            await message.reply(r)
+    
     async def on_message(self, message):
         '''
         This function is called whenever a message is sent in a channel that the bot can see (including DMs). 
@@ -101,6 +133,18 @@ class ModBot(discord.Client):
             self.reports.pop(author_id)
 
     async def handle_channel_message(self, message):
+
+        # Handle replies to reports in "group-#-mod" channel
+        if message.channel.name == f'group-{self.group_num}-mod':
+            # Message is a reply and message is not from bot
+            if message.reference is not None and message.author.id != self.user.id:
+                ref_id = message.reference.message_id
+                # Message requires content reviewer report
+                if ref_id in self.to_cr_report:
+                    # TODO: add report to backend storage
+                    await message.reply(f'Successfully added content reviewer report for message with id {ref_id}.')
+                    self.to_cr_report.remove(message.reference.message_id)
+
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return 
