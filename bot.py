@@ -36,8 +36,6 @@ class ModBot(discord.Client):
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
         self.perspective_key = key
-
-        self.to_cr_report = set() # Set of message IDs that require a content reviewer report
         self.db = Database()
 
     async def on_ready(self):
@@ -76,6 +74,9 @@ class ModBot(discord.Client):
         if message.reference is not None or message.author.id != self.user.id:
             return
 
+        # Get message ID from forwarded report content
+        original_message_ID = int(message.content.split(' ')[4])
+
         if payload.emoji.name == '👍':
             r = (f"Sufficient public indication that Tweet is a scam according to {payload.member.name}. "
             "Applying warning to Tweet. "
@@ -83,7 +84,7 @@ class ModBot(discord.Client):
             )
             prompt = await message.reply(r)
             # Marks as requiring content review report
-            self.to_cr_report.add(prompt.id)
+            self.db.add_prompt(prompt.id, original_message_ID)
             # TODO: issue warning in main group channel as reply to original message
         elif payload.emoji.name == '👎':
             r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
@@ -119,18 +120,18 @@ class ModBot(discord.Client):
             for add in addresses:
                 add = add.strip()
                 if add in after.content:
-                    r = ("Message has been edited to contain fraudulent or suspicious crypto addresses. ")
+                    r = "Message has been edited to contain fraudulent or suspicious crypto addresses. "
                     await after.reply(r)
                     is_blacklisted = True
                     break
                 elif add in before.content:
-                    r = ("Message previously containing fraudulent/suspicious crypto addresses have been edited to contain a new crypto address.")
+                    r = "Message previously containing fraudulent/suspicious crypto addresses have been edited to contain a new crypto address."
                     await after.reply(r)
                     is_blacklisted = True
                     break
             file.close()
             if not is_blacklisted:
-                r = ("Edited message does not contain blacklisted crypto address.")
+                r = "Edited message does not contain blacklisted crypto address."
                 await after.reply(r)
         
 
@@ -169,15 +170,16 @@ class ModBot(discord.Client):
             if message.reference is not None and message.author.id != self.user.id:
                 # Get prompt message
                 ref_id = message.reference.message_id
+                original_id = self.db.get_message_from_prompt(ref_id)
                 # Message requires content reviewer report
-                if ref_id in self.to_cr_report:
+                if original_id != None:
                     # Add report to database
                     time = message.created_at.strftime("%m/%d/%Y, %H:%M:%S")
                     report = self.create_report(message.author.name, time, message.content)
-                    # TODO: use original message rather than report to mod channel
-                    self.db.add_report(ref_id, report)
-                    await message.reply(f'Successfully added content reviewer report for report message with ID {ref_id}.')
-                    self.to_cr_report.remove(ref_id)
+                    self.db.add_report(original_id, report)
+                    self.db.remove_prompt(ref_id)
+                    await message.reply(f'Successfully added content reviewer report for report message with ID {original_id}.')
+                    
 
     async def handle_channel_message(self, message):
 
@@ -200,7 +202,7 @@ class ModBot(discord.Client):
         mod_channel = self.mod_channels[message.guild.id]
 
         # TODO: add previous content reviewer messages before sending to mod channel
-        await mod_channel.send(f'Forwarded message with ID :\n{message.author.name}: "{message.content}"')
+        await mod_channel.send(f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"')
 
         # TODO: handle score from Perspective
         scores = self.eval_text(message)
