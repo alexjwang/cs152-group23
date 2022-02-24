@@ -104,6 +104,33 @@ class ModBot(discord.Client):
             await self.handle_channel_message(message)
         else:
             await self.handle_dm(message)
+    
+    async def on_message_edit(self, before, after):
+        """
+        This function is called whenever a message is edited.
+        The bot is configured to check if a cryptoaddress has been edited, and whether or not the new message contains a
+        blacklisted crypto address.
+        """
+        with open("blacklist.txt", "r") as file:
+            addresses = file.readlines()
+            is_blacklisted = False
+            for add in addresses:
+                add = add.strip()
+                if add in after.content:
+                    r = (f"Message has been edited to contain fradulent/suspicious crypto addreses. ")
+                    await after.reply(r)
+                    is_blacklisted = True
+                    break
+                elif add in before.content:
+                    r = (f"Message previously containing fradulent/suspicious crypto addreses has been edited to contain new crypto address.")
+                    await after.reply(r)
+                    is_blacklisted = True
+                    break
+            file.close()
+            if not is_blacklisted:
+                r = (f"Edited message does not contain blacklisted crypto address.")
+                await after.reply(r)
+        
 
     async def handle_dm(self, message):
         # Handle a help message
