@@ -33,6 +33,7 @@ class ModBot(discord.Client):
         intents = discord.Intents.default()
         super().__init__(command_prefix='.', intents=intents)
         self.group_num = None   
+        self.group_channel = None # Main group channel
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
         self.perspective_key = key
@@ -55,6 +56,8 @@ class ModBot(discord.Client):
         # Find the mod channel in each guild that this bot should report to
         for guild in self.guilds:
             for channel in guild.text_channels:
+                if channel.name == f'group-{self.group_num}':
+                    self.group_channel = channel
                 if channel.name == f'group-{self.group_num}-mod':
                     self.mod_channels[guild.id] = channel
 
@@ -76,6 +79,7 @@ class ModBot(discord.Client):
 
         # Get message ID from forwarded report content
         original_message_ID = int(message.content.split(' ')[4])
+        original_message = await self.group_channel.fetch_message(original_message_ID)
 
         if payload.emoji.name == '👍':
             r = (f"Sufficient public indication that Tweet is a scam according to {payload.member.name}. "
@@ -85,13 +89,13 @@ class ModBot(discord.Client):
             prompt = await message.reply(r)
             # Marks as requiring content review report
             self.db.add_prompt(prompt.id, original_message_ID)
-            # TODO: issue warning in main group channel as reply to original message
+            await original_message.reply('Warning: Tweet has been marked as a scam by the content moderation team.')
         elif payload.emoji.name == '👎':
             r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
-            "Applying warning to Tweet, as well as additional information. "
+            "Applying warning to Tweet. "
             )
             await message.reply(r)
-            # TODO: issue different warning in main group channel as reply to original message
+            await original_message.reply('Warning: Tweet has been reported by users as a scam.')
     
     async def on_message(self, message):
         '''
@@ -116,25 +120,18 @@ class ModBot(discord.Client):
         """
         with open("blacklist.txt", "r") as file:
             addresses = file.readlines()
-            is_blacklisted = False
             for add in addresses:
                 add = add.strip()
                 if add in after.content:
                     r = "Message has been edited to contain fraudulent or suspicious crypto addresses. "
                     await after.reply(r)
-                    is_blacklisted = True
                     break
                 elif add in before.content:
                     r = "Message previously containing fraudulent/suspicious crypto addresses have been edited to contain a new crypto address."
                     await after.reply(r)
-                    is_blacklisted = True
                     break
             file.close()
-            if not is_blacklisted:
-                r = "Edited message does not contain blacklisted crypto address."
-                await after.reply(r)
         
-
     async def handle_dm(self, message):
         # Handle a help message
         if message.content == Report.HELP_KEYWORD:
@@ -201,8 +198,23 @@ class ModBot(discord.Client):
         # Forward the message to the mod channel
         mod_channel = self.mod_channels[message.guild.id]
 
-        # TODO: add previous content reviewer messages before sending to mod channel
-        await mod_channel.send(f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"')
+        fwd = f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"'
+        fwd += '\n\nPrevious content reports include the following: '
+        message_info = self.db.get_cr_reports(message.id)
+        if message_info == None:
+            fwd += '\nNo reports found.'
+        else:
+            for i in range(1, message_info['cr_report_count'] + 1):
+                report = message_info['cr_reports'][str(i)]
+                author = report['author']
+                desc = report['description']
+                time = report['time']
+                fwd += f'\nBy {author} at {time}: "{desc}"'
+        # TODO: retrieve previous content reviewer messages
+        fwd += '\n\nPlease review public engagement with Tweet and react to this message with 👍 if it suggests the Tweet is a scam.'
+        fwd += ' In this case, you will be asked to submit a content reviewer report.'
+        fwd += ' Otherwise react with 👎.'
+        await mod_channel.send(fwd)
 
         # TODO: handle score from Perspective
         scores = self.eval_text(message)

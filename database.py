@@ -60,3 +60,10 @@ class Database:
         '''
         ref = db.reference(f'Prompts/{prompt_id}')
         ref.delete()
+
+    def get_cr_reports(self, message_id):
+        '''
+        Given the message ID of the original message, retrieve its content reviewer reports.
+        '''
+        ref = db.reference(f'Messages/{message_id}')
+        return ref.get()
