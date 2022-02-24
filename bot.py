@@ -171,9 +171,9 @@ class ModBot(discord.Client):
                 if ref_id in self.to_cr_report:
                     # Add report to database
                     time = message.created_at.strftime("%m/%d/%Y, %H:%M:%S")
-                    self.create_report(message.author.name, time, message.content)
+                    report = self.create_report(message.author.name, time, message.content)
                     # TODO: use original message rather than report to mod channel
-                    self.db.add_report(ref_id, message.content)
+                    self.db.add_report(ref_id, report)
                     await message.reply(f'Successfully added content reviewer report for report message with ID {ref_id}.')
                     self.to_cr_report.remove(ref_id)
 
