@@ -84,11 +84,13 @@ class ModBot(discord.Client):
             prompt = await message.reply(r)
             # Marks as requiring content review report
             self.to_cr_report.add(prompt.id)
+            # TODO: issue warning in main group channel as reply to original message
         elif payload.emoji.name == '👎':
             r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
             "Applying warning to Tweet, as well as additional information. "
             )
             await message.reply(r)
+            # TODO: issue different warning in main group channel as reply to original message
     
     async def on_message(self, message):
         '''
@@ -117,18 +119,18 @@ class ModBot(discord.Client):
             for add in addresses:
                 add = add.strip()
                 if add in after.content:
-                    r = (f"Message has been edited to contain fradulent/suspicious crypto addreses. ")
+                    r = ("Message has been edited to contain fraudulent or suspicious crypto addresses. ")
                     await after.reply(r)
                     is_blacklisted = True
                     break
                 elif add in before.content:
-                    r = (f"Message previously containing fradulent/suspicious crypto addreses has been edited to contain new crypto address.")
+                    r = ("Message previously containing fraudulent/suspicious crypto addresses have been edited to contain a new crypto address.")
                     await after.reply(r)
                     is_blacklisted = True
                     break
             file.close()
             if not is_blacklisted:
-                r = (f"Edited message does not contain blacklisted crypto address.")
+                r = ("Edited message does not contain blacklisted crypto address.")
                 await after.reply(r)
         
 
@@ -151,7 +153,7 @@ class ModBot(discord.Client):
         if author_id not in self.reports:
             self.reports[author_id] = Report(self)
         
-        # Let the report class handle this message; forward all the messages it returns to uss
+        # Let the report class handle this message; forward all the messages it returns to us
         responses = await self.reports[author_id].handle_message(message)
         for r in responses:
             await message.channel.send(r)
@@ -186,21 +188,27 @@ class ModBot(discord.Client):
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return 
-        
-        # TODO: determine method to forward only sufficiently severe reported messages
+
+        # Automated flagging using blacklist
+        if (self.check_blacklist(message)):
+            await message.reply("Message contains fraudulent or suspicious crypto address.")
+            return
+
+        # TODO: perform severity check on USER REPORTS and either increment count in DB or forward
 
         # Forward the message to the mod channel
         mod_channel = self.mod_channels[message.guild.id]
+
+        # TODO: add previous content reviewer messages before sending to mod channel
         await mod_channel.send(f'Forwarded message with ID :\n{message.author.name}: "{message.content}"')
 
-        # TODO: DELETE PERSPECTIVE STUFF
+        # TODO: handle score from Perspective
         scores = self.eval_text(message)
         await mod_channel.send(self.code_format(json.dumps(scores, indent=2)))        
 
-
     def create_report(self, author, time, description):
         '''
-        Given information about a report, create a dictionary represenation of the report.
+        Given information about a report, create a dictionary representation of the report.
         '''
         report_dict = {
             'author': author,
@@ -208,6 +216,16 @@ class ModBot(discord.Client):
             'description': description
         }
         return report_dict
+
+    def check_blacklist(self, message):
+        with open("blacklist.txt", "r") as file:
+            addresses = file.readlines()
+            for add in addresses:
+                add = add.strip()
+                if add in message.content:
+                    return True
+        return False
+
 
     def eval_text(self, message):
         '''
