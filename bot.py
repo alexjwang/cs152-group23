@@ -178,6 +178,10 @@ class ModBot(discord.Client):
                     await message.reply(f'Successfully added content reviewer report for report message with ID {original_id}.')
                     
 
+    def is_severe(self, message):
+        # TODO: Implement this function
+        return True
+
     async def handle_channel_message(self, message):
 
         if message.channel.name == f'group-{self.group_num}-mod':
@@ -193,13 +197,16 @@ class ModBot(discord.Client):
             await message.reply("Message contains fraudulent or suspicious crypto address.")
             return
 
-        # TODO: perform severity check on USER REPORTS and either increment count in DB or forward
+        # Add to non-severe count
+        if not self.is_severe(message):
+            self.db.add_not_severe(message.id)
+            return
 
         # Forward the message to the mod channel
         mod_channel = self.mod_channels[message.guild.id]
 
         fwd = f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"'
-        fwd += '\n\nPrevious content reports include the following: '
+        fwd += '\n\nPrevious content reviewer reports include the following: '
         message_info = self.db.get_cr_reports(message.id)
         if message_info == None:
             fwd += '\nNo reports found.'
@@ -210,7 +217,6 @@ class ModBot(discord.Client):
                 desc = report['description']
                 time = report['time']
                 fwd += f'\nBy {author} at {time}: "{desc}"'
-        # TODO: retrieve previous content reviewer messages
         fwd += '\n\nPlease review public engagement with Tweet and react to this message with 👍 if it suggests the Tweet is a scam.'
         fwd += ' In this case, you will be asked to submit a content reviewer report.'
         fwd += ' Otherwise react with 👎.'

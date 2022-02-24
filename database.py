@@ -42,7 +42,7 @@ class Database:
         '''
         Given the message ID of a prompt and the ID of the original message, add the information to the database.
         '''
-        ref = db.reference(f'/')
+        ref = db.reference('/')
         ref.update({
             f'Prompts/{prompt_id}': message_id
         })
@@ -67,3 +67,16 @@ class Database:
         '''
         ref = db.reference(f'Messages/{message_id}')
         return ref.get()
+    
+    def add_not_severe(self, message_id):
+        '''
+        Given the message ID of a message, increment its count for the number of non-severe reports.
+        '''
+        ref = db.reference(f'Messages/{message_id}/non_severe_count')
+        non_severe_count = ref.get()
+        if non_severe_count == None:
+            non_severe_count = 0
+            self.create_message_record(message_id)
+        ref.update({
+            f'Messages/{message_id}/non_severe_count': non_severe_count + 1
+        })
