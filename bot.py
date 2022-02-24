@@ -8,6 +8,16 @@ import re
 import requests
 from report import Report
 from unidecode import unidecode 
+from datetime import datetime
+
+# Report storage
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+cred = credentials.Certificate('firebase-sdk.json')
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://cs-152-group-23-default-rtdb.firebaseio.com/'
+})
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -39,6 +49,9 @@ class ModBot(discord.Client):
         self.to_cr_report = set() # Set of message IDs that require a content reviewer report
 
     async def on_ready(self):
+
+        # TODO: check if Messages exists in Firebase and if not add it
+
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
             print(f' - {guild.name}')
@@ -76,11 +89,11 @@ class ModBot(discord.Client):
         if payload.emoji.name == '👍':
             r = (f"Sufficient public indication that Tweet is a scam according to {payload.member.name}. "
             "Applying warning to Tweet. "
-            "Please reply to this message with content reviewer report. "
+            "Please reply to this message with a content reviewer report. "
             )
-            await message.reply(r)
-            # Marks are requiring content review report
-            self.to_cr_report.add(payload.message_id)
+            prompt = await message.reply(r)
+            # Marks as requiring content review report
+            self.to_cr_report.add(prompt.id)
         elif payload.emoji.name == '👎':
             r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
             "Applying warning to Tweet, as well as additional information. "
@@ -139,11 +152,9 @@ class ModBot(discord.Client):
 
         author_id = message.author.id
         responses = []
-        print("line 82")
 
         # Only respond to messages if they're part of a reporting flow
         if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD):
-            print("line 85")
             return
 
         # If we don't currently have an active report for this user, add one
@@ -159,29 +170,82 @@ class ModBot(discord.Client):
         if self.reports[author_id].report_complete():
             self.reports.pop(author_id)
 
-    async def handle_channel_message(self, message):
-
+    async def handle_mod_message(self, message):
         # Handle replies to reports in "group-#-mod" channel
         if message.channel.name == f'group-{self.group_num}-mod':
             # Message is a reply and message is not from bot
             if message.reference is not None and message.author.id != self.user.id:
+                # Get prompt message
                 ref_id = message.reference.message_id
                 # Message requires content reviewer report
                 if ref_id in self.to_cr_report:
-                    # TODO: add report to backend storage
-                    await message.reply(f'Successfully added content reviewer report for message with id {ref_id}.')
-                    self.to_cr_report.remove(message.reference.message_id)
+                    # Add report to database
+                    time = message.created_at.strftime("%m/%d/%Y, %H:%M:%S")
+                    self.create_report(message.author.name, time, message.content)
+                    # TODO: use original message rather than report to mod channel
+                    self.add_report(ref_id, message.content)
+                    await message.reply(f'Successfully added content reviewer report for report message with ID {ref_id}.')
+                    self.to_cr_report.remove(ref_id)
+
+    async def handle_channel_message(self, message):
+
+        if message.channel.name == f'group-{self.group_num}-mod':
+            await self.handle_mod_message(message)
+            return
 
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return 
         
+        # TODO: determine method to forward only sufficiently severe reported messages
+
         # Forward the message to the mod channel
         mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+        await mod_channel.send(f'Forwarded message with ID :\n{message.author.name}: "{message.content}"')
 
+        # TODO: DELETE PERSPECTIVE STUFF
         scores = self.eval_text(message)
-        await mod_channel.send(self.code_format(json.dumps(scores, indent=2)))
+        await mod_channel.send(self.code_format(json.dumps(scores, indent=2)))        
+
+
+    def create_report(self, author, time, description):
+        '''
+        Given information about a report, create a dictionary represenation of the report.
+        '''
+        report_dict = {
+            'author': author,
+            'time': time,
+            'description': description
+        }
+        return report_dict
+
+    def create_message_record(self, messageID):
+        '''
+        Given a message ID, create a new record for its reports in the database.
+        '''
+        ref = db.reference('/')
+        ref.update({
+            f'Messages/{messageID}': {
+                'reports': {},
+                'cr_report_count': 0,
+                'non_severe_count': 0
+            },
+        })
+
+    def add_report(self, messageID, report):
+        '''
+        Given a content reviewer report containing author, time, and description, adds the report to the database.
+        '''
+        num_cr_reports = db.reference(f'Messages/{messageID}/cr_report_count').get()
+        if num_cr_reports is None:
+            self.create_message_record(messageID)
+            num_cr_reports = db.reference(f'Messages/{messageID}/cr_report_count').get()
+        
+        ref = db.reference(f'Messages/{messageID}')
+        ref.update({
+            f'reports/{str(num_cr_reports + 1)}': report,
+            'cr_report_count': num_cr_reports + 1
+        })
 
     def eval_text(self, message):
         '''
