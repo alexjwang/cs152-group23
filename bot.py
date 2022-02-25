@@ -5,7 +5,6 @@ import os
 import json
 import logging
 import re
-import requests
 from report import Report
 from database import Database
 from unidecode import unidecode 
@@ -146,7 +145,7 @@ class ModBot(discord.Client):
             fwd += '\nNo reports found.'
         else:
             for i in range(1, message_info['cr_report_count'] + 1):
-                report = message_info['cr_reports'][str(i)]
+                report = message_info['cr_reports'][i]
                 author = report['author']
                 desc = report['description']
                 time = report['time']
