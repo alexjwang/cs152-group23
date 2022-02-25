@@ -2,3 +2,5 @@ tokens.json
 discord.log
 __pycache__
 firebase-sdk.json
+*.csv
+.ipynb_checkpoints/
