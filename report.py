@@ -31,6 +31,10 @@ class Report:
         self.state = State.REPORT_START
         self.client = client
         self.message = None
+
+        # For report flow
+        self.message_id = -1
+        self.should_fwd = False
     
     async def handle_message(self, message):
         '''
@@ -69,8 +73,9 @@ class Report:
 
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
+            self.message_id = message.id
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "Help us understand the problem. What's going on with this message? Please type the number of the following reaons: 1. I am not interested in this message. 2. It's suspicious or scam. 3. It's abusive or harmful. 4. It's misleading. 5. It expresses intentions of self-hard or suicide."]
+                    "Help us understand the problem. What's going on with this message? Please type the number of the following reasons: 1. I am not interested in this message. 2. It's suspicious or a scam. 3. It's abusive or harmful. 4. It's misleading. 5. It expresses intentions of self-harm or suicide."]
       
         if self.state == State.MESSAGE_IDENTIFIED:
             if message.content == "1": 
@@ -78,7 +83,7 @@ class Report:
                 return ["We will investigate this message and get back to you soon."]
             elif message.content == "2": 
                 self.state = State.SCAM_FOUND
-                return ["Is this message related to finance (investment, buying crytocurrencies etc.) Please answer yes or no."]
+                return ["Is this message related to finance (investment, buying crytocurrencies etc.)? Please answer yes or no."]
 
             elif message.content == "3": 
                 self.state = State.REPORT_COMPLETE
@@ -94,7 +99,7 @@ class Report:
                 return["Please choose a number."]
         if self.state == State.MISLEADING_TYPE: 
             self.state = State.MISLEADING_REASON
-            return ["Why is this message misleading? Please type the number the of following reasons: 1. Politices 2. Health 3. Something else"]
+            return ["Why is this message misleading? Please type the number corresponding to one of the following reasons: 1. Politices 2. Health 3. Something else"]
 
         if self.state == State.MISLEADING_REASON: 
             if message.content == "1":
@@ -112,7 +117,7 @@ class Report:
         if self.state == State.CHECK_TYPE:
             if message.content == "yes": 
                 self.state = State.SCAM_IDENTIFIED
-                return ["What's wrong with this message or the user who posted it? Please type the number the of following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
             elif message.content == "no":
                 self.state = State.ACTION_NEEDED
                 return ["Would like to block or mute the account? Please answer block or mute."]
@@ -122,10 +127,10 @@ class Report:
         if self.state == State.SCAM_FOUND:
             if message.content == "yes": 
                 self.state = State.SCAM_IDENTIFIED
-                return ["What's wrong with this message or the user who posted it? Please type the number the of following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
             elif message.content == "no":
                 self.state = State.NOT_RELATED_TO_FINANCE
-                return ["What is the tweet related to?  Please type the number the of following reasons: 1. The accout posted the message is feak. 2. the message contains links to potentially harmful, malicious, phishing site. 3. The hashtags seem unrelated. 4. The message is a spam. 5. Someting else"]
+                return ["What is the tweet related to? Please type the number corresponding to one of the following reasons: 1. The accout posted the message is feak. 2. the message contains links to potentially harmful, malicious, phishing site. 3. The hashtags seem unrelated. 4. The message is a spam. 5. Someting else"]
             else: 
                 return["Please answer yes or no."]
                 
@@ -151,6 +156,7 @@ class Report:
 
         if self.state == State.CHECK_MONEY:
             if message.content == "yes":
+                self.should_fwd = True
                 self.state = State.MONEY_CHECKED
                 
             elif message.content == "no":

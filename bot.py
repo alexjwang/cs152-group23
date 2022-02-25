@@ -36,6 +36,7 @@ class ModBot(discord.Client):
         self.group_channel = None # Main group channel
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
+        self.reported = {} # Map from message IDs to boolean to forward
         self.perspective_key = key
         self.db = Database()
 
@@ -95,6 +96,7 @@ class ModBot(discord.Client):
             "Applying warning to Tweet. "
             )
             await message.reply(r)
+            self.db.add_not_severe(original_message_ID)
             await original_message.reply('Warning: Tweet has been reported by users as a scam.')
     
     async def on_message(self, message):
@@ -131,12 +133,35 @@ class ModBot(discord.Client):
                     await after.reply(r)
                     break
             file.close()
-        
+    
+    async def fwd_reported(self, message_id):
+        message = await self.group_channel.fetch_message(message_id)
+        # Forward the message to the mod channel
+        mod_channel = self.mod_channels[message.guild.id]
+
+        fwd = f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"'
+        fwd += '\n\nPrevious content reviewer reports include the following: '
+        message_info = self.db.get_cr_reports(message.id)
+        if message_info == None:
+            fwd += '\nNo reports found.'
+        else:
+            for i in range(1, message_info['cr_report_count'] + 1):
+                report = message_info['cr_reports'][str(i)]
+                author = report['author']
+                desc = report['description']
+                time = report['time']
+                fwd += f'\nBy {author} at {time}: "{desc}"'
+        fwd += '\n\nPlease review public engagement with Tweet and react to this message with 👍 if it suggests the Tweet is a scam.'
+        fwd += ' In this case, you will be asked to submit a content reviewer report.'
+        fwd += ' Otherwise react with 👎.'
+        await mod_channel.send(fwd)
+
     async def handle_dm(self, message):
         # Handle a help message
         if message.content == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
+            print("Send reply to help")
             await message.channel.send(reply)
             return
 
@@ -158,6 +183,16 @@ class ModBot(discord.Client):
 
         # If the report is complete or cancelled, remove it from our map
         if self.reports[author_id].report_complete():
+            # Get message ID corresponding to report
+            mid = self.reports[author_id].message_id
+            # Message ID identified (report completed)
+            if mid > 0:
+                # Check if message should be forwarded
+                if self.reports[author_id].should_fwd or self.db.get_not_severe(mid) > 2:
+                    await self.fwd_reported(mid)
+                else:
+                    self.db.add_not_severe(mid)
+            # Remove complete/conacelled report from our map
             self.reports.pop(author_id)
 
     async def handle_mod_message(self, message):
@@ -176,11 +211,6 @@ class ModBot(discord.Client):
                     self.db.add_report(original_id, report)
                     self.db.remove_prompt(ref_id)
                     await message.reply(f'Successfully added content reviewer report for report message with ID {original_id}.')
-                    
-
-    def is_severe(self, message):
-        # TODO: Implement this function
-        return True
 
     async def handle_channel_message(self, message):
 
@@ -196,35 +226,6 @@ class ModBot(discord.Client):
         if (self.check_blacklist(message)):
             await message.reply("Message contains fraudulent or suspicious crypto address.")
             return
-
-        # Add to non-severe count
-        if not self.is_severe(message):
-            self.db.add_not_severe(message.id)
-            return
-
-        # Forward the message to the mod channel
-        mod_channel = self.mod_channels[message.guild.id]
-
-        fwd = f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"'
-        fwd += '\n\nPrevious content reviewer reports include the following: '
-        message_info = self.db.get_cr_reports(message.id)
-        if message_info == None:
-            fwd += '\nNo reports found.'
-        else:
-            for i in range(1, message_info['cr_report_count'] + 1):
-                report = message_info['cr_reports'][str(i)]
-                author = report['author']
-                desc = report['description']
-                time = report['time']
-                fwd += f'\nBy {author} at {time}: "{desc}"'
-        fwd += '\n\nPlease review public engagement with Tweet and react to this message with 👍 if it suggests the Tweet is a scam.'
-        fwd += ' In this case, you will be asked to submit a content reviewer report.'
-        fwd += ' Otherwise react with 👎.'
-        await mod_channel.send(fwd)
-
-        # TODO: handle score from Perspective
-        scores = self.eval_text(message)
-        await mod_channel.send(self.code_format(json.dumps(scores, indent=2)))        
 
     def create_report(self, author, time, description):
         '''
@@ -245,35 +246,6 @@ class ModBot(discord.Client):
                 if add in message.content:
                     return True
         return False
-
-
-    def eval_text(self, message):
-        '''
-        Given a message, forwards the message to Perspective and returns a dictionary of scores.
-        '''
-        PERSPECTIVE_URL = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
-        message.content = unidecode(message.content, errors='preserve')
-        url = PERSPECTIVE_URL + '?key=' + self.perspective_key
-        data_dict = {
-            'comment': {'text': message.content},
-            'languages': ['en'],
-            'requestedAttributes': {
-                                    'SEVERE_TOXICITY': {}, 'PROFANITY': {},
-                                    'IDENTITY_ATTACK': {}, 'THREAT': {},
-                                    'TOXICITY': {}, 'FLIRTATION': {}
-                                },
-            'doNotStore': True
-        }
-        response = requests.post(url, data=json.dumps(data_dict))
-        response_dict = response.json()
-        scores = {}
-        for attr in response_dict["attributeScores"]:
-            scores[attr] = response_dict["attributeScores"][attr]["summaryScore"]["value"]
-
-        return scores
-    
-    def code_format(self, text):
-        return "```" + text + "```"
             
         
 client = ModBot(perspective_key)
