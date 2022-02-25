@@ -139,6 +139,12 @@ class ModBot(discord.Client):
         mod_channel = self.mod_channels[message.guild.id]
 
         fwd = f'Forwarded message with ID {message.id} \n{message.author.name}: "{message.content}"'
+        # check if messages are disguised in unicode
+        content_decoded = unidecode(message.content, errors='preserve')
+        if content_decoded != message.content:
+            fwd += f'\nUnicode detected! Translating unicode characters to the ascii equivalents... \n{message.author.name}: "{content_decoded}"'
+            message.content = content_decoded
+
         fwd += '\n\nPrevious content reviewer reports include the following: '
         message_info = self.db.get_cr_reports(message.id)
         if message_info == None:
