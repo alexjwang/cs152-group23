@@ -257,17 +257,18 @@ class ModBot(discord.Client):
         return False
     
     def check_classifer(self, message):
-        contains_btc_add = bool(re.search("[13][a-km-zA-HJ-NP-Z1-9]{25,34}", message))
-        contains_eth_add = bool(re.search("0x[a-fA-F0-9]{40}$", message))
+        string = message.content
+        contains_btc_add = bool(re.search("[13][a-km-zA-HJ-NP-Z1-9]{25,34}", string))
+        contains_eth_add = bool(re.search("0x[a-fA-F0-9]{40}$", string))
         phrases = ['legit', 'legitimate', 'send me', 'double', 'whatsapp']
         legit_bot_phrases = ['transferred from', 'move from']
         contains_scam_phrase = False
         for phrase in phrases:
-            if phrase in message.lower():
+            if phrase in string.lower():
                 contains_scam_phrase = True
         contains_legit_phrase = False
         for phrase in legit_bot_phrases:
-            if phrase in message.lower():
+            if phrase in string.lower():
                 contains_legit_phrase = True
         return ((not contains_legit_phrase) and (contains_btc_add or contains_eth_add or contains_scam_phrase))
             
