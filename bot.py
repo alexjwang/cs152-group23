@@ -79,7 +79,11 @@ class ModBot(discord.Client):
 
         # Get message ID from forwarded report content
         original_message_ID = int(message.content.split(' ')[4])
-        original_message = await self.group_channel.fetch_message(original_message_ID)
+        original_message = None
+        try:
+            original_message = await self.group_channel.fetch_message(original_message_ID)
+        except:
+            return
 
         if payload.emoji.name == '👍':
             r = (f"Sufficient public indication that Tweet is a scam according to {payload.member.name}. "
@@ -97,6 +101,12 @@ class ModBot(discord.Client):
             await message.reply(r)
             self.db.add_not_severe(original_message_ID)
             await original_message.reply('Warning: Tweet has been reported by users as a scam.')
+        elif payload.emoji.name == '❌':
+            original_message.delete()
+            r = (f"Previous content reviewer reports suggest Tweet should be deleted according to {payload.member.name}. "
+            "Deleting Tweet."
+            )
+            await message.reply(r)
     
     async def on_message(self, message):
         '''
@@ -153,7 +163,8 @@ class ModBot(discord.Client):
                 fwd += f'\nBy {author} at {time}: "{desc}"'
         fwd += '\n\nPlease review public engagement with Tweet and react to this message with 👍 if it suggests the Tweet is a scam.'
         fwd += ' In this case, you will be asked to submit a content reviewer report.'
-        fwd += ' Otherwise react with 👎.'
+        fwd += ' Otherwise, react with 👎.'
+        fwd += ' If prior reviews indicate the original message should be deleted, react with ❌.'
         await mod_channel.send(fwd)
 
     async def handle_dm(self, message):
