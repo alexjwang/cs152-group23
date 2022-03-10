@@ -89,7 +89,7 @@ class ModBot(discord.Client):
             prompt = await message.reply(r)
             # Marks as requiring content review report
             self.db.add_prompt(prompt.id, original_message_ID)
-            await original_message.reply('Warning: Tweet has been marked as a scam by the content moderation team.')
+            await original_message.reply('Warning: Tweet has been confirmed to be a scam by the content moderation team.')
         elif payload.emoji.name == '👎':
             r = (f"Insufficient public indication that Tweet is a scam according to {payload.member.name}. "
             "Applying warning to Tweet. "
