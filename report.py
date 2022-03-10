@@ -75,7 +75,7 @@ class Report:
             self.state = State.MESSAGE_IDENTIFIED
             self.message_id = message.id
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "Help us understand the problem. What's going on with this message? Please type the number of the following reasons: 1. I am not interested in this message. 2. It's suspicious or a scam. 3. It's abusive or harmful. 4. It's misleading. 5. It expresses intentions of self-harm or suicide."]
+                    "Help us understand the problem. What's going on with this message? Please type the number of the following reasons: \n1. I am not interested in this message. \n2. It's suspicious or a scam. \n3. It's abusive or harmful. \n4. It's misleading. \n5. It expresses intentions of self-harm or suicide."]
       
         if self.state == State.MESSAGE_IDENTIFIED:
             if message.content == "1": 
@@ -117,7 +117,7 @@ class Report:
         if self.state == State.CHECK_TYPE:
             if message.content == "yes": 
                 self.state = State.SCAM_IDENTIFIED
-                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: \n1. Tweet is sending people to misleading url. \n2. Account is impersonating someone else. \n3. Something else"]
             elif message.content == "no":
                 self.state = State.ACTION_NEEDED
                 return ["Would like to block or mute the account? Please answer block or mute."]
@@ -127,10 +127,10 @@ class Report:
         if self.state == State.SCAM_FOUND:
             if message.content == "yes": 
                 self.state = State.SCAM_IDENTIFIED
-                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: 1. Tweet is sending people to misleading url. 2. Account is impersonating someone else. 3. Something else"]
+                return ["What's wrong with this message or the user who posted it? Please type the number corresponding to one of the following reasons: \n1. Tweet is sending people to misleading url. \n2. Account is impersonating someone else. \n3. Something else"]
             elif message.content == "no":
                 self.state = State.NOT_RELATED_TO_FINANCE
-                return ["What is the tweet related to? Please type the number corresponding to one of the following reasons: 1. The accout posted the message is feak. 2. the message contains links to potentially harmful, malicious, phishing site. 3. The hashtags seem unrelated. 4. The message is a spam. 5. Someting else"]
+                return ["What is the tweet related to? Please type the number corresponding to one of the following reasons: \n1. The account that posted the message is fake. \n2. the message contains links to potentially harmful, malicious, phishing site. \n3. The hashtags seem unrelated. \n4. The message is a spam. \n5. Something else"]
             else: 
                 return["Please answer yes or no."]
                 
