@@ -232,8 +232,9 @@ class ModBot(discord.Client):
             await message.reply("Message contains fraudulent or suspicious crypto address.")
             return
         
-        if (self.check_classifer(message)):
-            await message.reply("Message contains fraudulent or suspicious crypto messaging.")
+        # Automated flagging using classifier
+        if (self.check_classifier(message)):
+            self.db.add_not_severe(message.id)
             return
 
     def create_report(self, author, time, description):
@@ -256,7 +257,7 @@ class ModBot(discord.Client):
                     return True
         return False
     
-    def check_classifer(self, message):
+    def check_classifier(self, message):
         string = message.content
         contains_btc_add = bool(re.search("[13][a-km-zA-HJ-NP-Z1-9]{25,34}", string))
         contains_eth_add = bool(re.search("0x[a-fA-F0-9]{40}$", string))
