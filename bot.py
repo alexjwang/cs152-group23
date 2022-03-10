@@ -102,7 +102,7 @@ class ModBot(discord.Client):
             self.db.add_not_severe(original_message_ID)
             await original_message.reply('Warning: Tweet has been reported by users as a scam.')
         elif payload.emoji.name == '❌':
-            original_message.delete()
+            await original_message.delete()
             r = (f"Previous content reviewer reports suggest Tweet should be deleted according to {payload.member.name}. "
             "Deleting Tweet."
             )
